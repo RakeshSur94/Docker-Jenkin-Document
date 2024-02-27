@@ -1,0 +1,101 @@
+To Create RSA Key Pair command
+---------------------------------------------
+openssl genrsa -out keypair.pem 2048
+openssl rsa -in keypair.pem -pubout -out public.pem
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in keypair.pem -out private.pem
+
+Dokcer file
+-----------------------
+FROM openjdk:17-alpine
+ARG JAR_FILE=target/UserRegistrationService-1.1-SNAPSHOT.jar
+ADD ${JAR_FILE} userregistration.jar
+ENTRYPOINT ["java","-jar","/userregistration.jar"]
+
+Docker command to create image and run Kafka setup
+-------------------------------------------------------------------------
+docker compose -f  zookeeper.yml up
+
+Docker command for Spring Boot app and Mysql
+-----------------------------------------------------------------
+docker network create spring-net
+docker network connect spring-net mysqldb
+
+docker run -p 3307:3306 mysqldb -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=test mysql:latest .
+
+docker run -p 3307:3306 mysqldb -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=test mysql:8.0.34
+
+docker run -p 9090:8080 --name spring-docker --net spring-net -e MYSQL_HOST=mysqldb -e MYSQL_USER=root -e MYSQL_PASSWORD=root -e MYSQL_PORT=3306 spring-docker
+
+docker-compose down --rmi all
+
+
+
+ Sonar coommand
+-------------------------------
+https://github.com/danvisrinivas/Java-RD
+
+ Junit and Mockito along with Jacoco and SonarQube report
+ Sonar coommand to generate SonarQube Quality Gateway
+ mvn clean verify peaceful_shannon:sonar
+ docker pull sonarqube
+mvn clean verify sonar:sonar
+mvn clean install -> which installs target folder with site folder where you can actually see Test Coverage report for your controllers and services
+ Run Sonar in docker command:
+docker run --name sonar -p 9000:9000 sonarqube:lts-community
+
+Download Jenlkins from this URL:
+https://updates.jenkins.io/download/war/
+
+and run below command :
+java -jar Jenkins.war
+
+
+Jenkins ci-cd
+-------------------
+pipeline{
+    agent any
+    tools{
+        maven 'MAVEN'
+    }
+    stages{
+        stage('Checkout'){
+            steps{
+               checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/danvisrinivas/Java-RD']])
+        }
+        }
+        stage('Build maven project'){
+            steps{
+                bat "mvn clean install -DskipTests=true"
+            }
+        }
+        stage('Test and Code Coverage') {
+            steps {
+                script {
+                    bat 'mvn test jacoco:report'
+                }
+            }
+            post {
+                always {
+                    jacoco(execPattern: '**/target/jacoco.exec')
+                }
+            }
+        }
+        stage('SonarQube'){
+            steps{
+            bat "mvn sonar:sonar"
+        }
+        post {
+                success {
+                    script {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
